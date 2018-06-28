@@ -95,13 +95,12 @@ int main() {
           const double v = j[1]["speed"];
 
           /*
-           * Implementation start
-           *
            * Calculate steeering angle and throttle using MPC.
-           *
            * Both are in between [-1, 1].
-           *
            */
+          ///*********************************
+          ///*   Start of implementation     *
+          ///*********************************
 
           // Transform ptsx, ptsy to car the coordinate
           /// Implement in separate function
@@ -213,11 +212,9 @@ int main() {
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
 
-          /*
-           *
-           * End implementation
-           *
-           */
+          ///*********************************
+          ///*    End of implementation      *
+          ///*********************************
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           std::cout << msg << std::endl;
