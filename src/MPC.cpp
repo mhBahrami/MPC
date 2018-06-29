@@ -136,6 +136,13 @@ public:
 
       // Fill in fg with differences between actual and predicted states
       // add 2 to indices because (+1) from cost and (+1) because logging error of prediction (next timestep)
+      // Recall the equations for the model:
+      // x_[t]    = x[t-1]    + v[t-1] * cos(psi[t-1]) * dt
+      // y_[t]    = y[t-1]    + v[t-1] * sin(psi[t-1]) * dt
+      // psi_[t]  = psi[t-1]  - v[t-1] / Lf * delta[t-1] * dt
+      // v_[t]    = v[t-1]    + a[t-1] * dt
+      // cte[t]   = f(x[t-1]) - y[t-1]      + v[t-1] * sin(epsi[t-1]) * dt
+      // epsi[t]  = psi[t]    - psides[t-1] - v[t-1] * delta[t-1] / Lf * dt
       fg[2 + x_start + i] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
       fg[2 + y_start + i] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
       fg[2 + psi_start + i] = psi1 - (psi0 - v0 * delta0 / Lf * dt);
