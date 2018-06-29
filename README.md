@@ -1,7 +1,90 @@
-# CarND-Controls-MPC
-Self-Driving Car Engineer Nanodegree Program
+# Model Predictive Controller (MPC)
+
+In this project, I implemented Model Predictive Control to drive the car around the track. This time however you're not given the cross track error, you'll have to calculate that yourself! Additionally, there's a 100 millisecond latency between actuations commands on top of the connection latency.
 
 ---
+
+## The Model
+
+The vehicle model used in this project is a kinematic bicycle model. It neglects all dynamical effects such as inertia, friction and torque. The model takes changes of heading direction into account and is thus non-linear. The model used consists of the following equations
+
+```c++
+// Recall the equations for the model:
+x_[t]    = x[t-1]    + v[t-1] * cos(psi[t-1]) * dt
+y_[t]    = y[t-1]    + v[t-1] * sin(psi[t-1]) * dt
+psi_[t]  = psi[t-1]  - v[t-1] / Lf * delta[t-1] * dt
+v_[t]    = v[t-1]    + a[t-1] * dt
+cte[t]   = f(x[t-1]) - y[t-1]      + v[t-1] * sin(epsi[t-1]) * dt
+epsi[t]  = psi[t]    - psides[t-1] - v[t-1] * delta[t-1] / Lf * dt
+```
+
+which,
+
+- **`x, y` :** the position of the car
+- **`psi`:** the heading direction
+- **`v`:** the car velocity
+- **`cte`:** the cross-tracking error
+- **`epsi`:** the orientation error
+- **`Lf`:** the distance between the center of mass of the vehicle and the front wheels and affects the maneuverability.
+
+>The model can be found in the class [FG_eval (line 139)](https://github.com/mhBahrami/MPC/blob/master/src/MPC.cpp#L139) .
+
+### The State
+
+The state contains four parameters as follows:
+
+- **`x, y`:** car position
+- **`psi`:** the car orientation
+- **`v`:** the car velocity
+
+### The Actuators
+
+We can control the system (here a self driving car) by its actuators. For our system there are two actuators:
+
+- **`delta`:** the steering angle
+- **`a`:** the car acceleration which is known as throttle and/or brake pedals.
+
+### How the model works?
+
+The steps are as follows:
+
+1. Pass the current state as the INITIAL STATE to the MPC.
+2. Call the optimization solver. Given the INITIAL STATE, the solver (`Ipopt`) will minimize the cost function and return the relevant vector of control inputs. 
+3. Apply the obtained control input to the car.
+4. Repeat the previous steps again!
+
+## Tuning The Parameters
+
+There are two tuning parameters **`N`** (the number of time steps) and **`dt`** (the length of each time step). 
+
+You can see the different `N` and `dt` that I chose in the below table.
+
+|  #   | `N`  | `dt`  | Description                                                  |
+| :--: | :--: | :---: | ------------------------------------------------------------ |
+|  1   | `10` | `0.1` | The green path would often deviate to the right or left near the end, so I tried increasing `N` and then the model will fit more of the upcoming path and would be penalized more if it curved off erratically after `10` steps. |
+|  2   | `15` | `0.1` | Increasing the `N`  improves the fit and made the car drive smoother. |
+|  3   | `10` | `0.2` | Increasing the `dt`  makes the model response time larger and it causes the car crashes often. Because the model re-evaluate the model less frequently. |
+|  4   | `20` | `0.1` | Increasing the `N`  more than `15` will reduce the stability of the car in the path. |
+
+So, I chose `N` and `dt` equal to [`15`](https://github.com/mhBahrami/MPC/blob/master/src/MPC.cpp#L12) and [`0.1`](https://github.com/mhBahrami/MPC/blob/master/src/MPC.cpp#L13), respectively.
+
+## The Latency
+
+If you don't consider the latency, the car will do based on what it should have done `t_latency` ago. It means the car will change its position (steering angle) and its speed (throttle) too late! For instance it might not start steering let say to the left when the path is turning to the left and it leads the car to go off the track. The higher the speed, the greater the damage could be.
+
+For our car in the simulator the latency time is `100 ms`.
+
+### Integrating the latency to the implementation
+
+It's easy! We should use our model to predict the state `100 ms` (the latency time) ahead of time and then feed that `state` to the MPC solver.
+
+> You can find it in the `main.cpp` (from [line 144](https://github.com/mhBahrami/MPC/blob/master/src/main.cpp#L144) to [line 158](https://github.com/mhBahrami/MPC/blob/master/src/main.cpp#L158)). 
+
+**NOTE: Predicting the state `100 ms` ahead gives a worse outcome than predicting the state with no latency time!** 
+
+## The End Result (Video)
+
+I recorded the end result and you can [watch it on YouTube](https://youtu.be/cWWs9NkSMBo).
 
 ## Dependencies
 
@@ -38,71 +121,10 @@ Self-Driving Car Engineer Nanodegree Program
 3. Compile: `cmake .. && make`
 4. Run it: `./mpc`.
 
-## Tips
-
-1. It's recommended to test the MPC on basic examples to see if your implementation behaves as desired. One possible example
-is the vehicle starting offset of a straight line (reference). If the MPC implementation is correct, after some number of timesteps
-(not too many) it should find and track the reference line.
-2. The `lake_track_waypoints.csv` file has the waypoints of the lake track. You could use this to fit polynomials and points and see of how well your model tracks curve. NOTE: This file might be not completely in sync with the simulator so your solution should NOT depend on it.
-3. For visualization this C++ [matplotlib wrapper](https://github.com/lava/matplotlib-cpp) could be helpful.)
-4.  Tips for setting up your environment are available [here](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/23d376c7-0195-4276-bdf0-e02f1f3c665d)
-5. **VM Latency:** Some students have reported differences in behavior using VM's ostensibly a result of latency.  Please let us know if issues arise as a result of a VM environment.
-
-## Editor Settings
-
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
-
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
-
 ## Code Style
 
 Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
 
-## Project Instructions and Rubric
+## License
 
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
-
-More information is only accessible by people who are already enrolled in Term 2
-of CarND. If you are enrolled, see [the project page](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/f1820894-8322-4bb3-81aa-b26b3c6dcbaf/lessons/b1ff3be0-c904-438e-aad3-2b5379f0e0c3/concepts/1a2255a0-e23c-44cf-8d41-39b8a3c8264a)
-for instructions and the project rubric.
-
-## Hints!
-
-* You don't have to follow this directory structure, but if you do, your work
-  will span all of the .cpp files here. Keep an eye out for TODOs.
-
-## Call for IDE Profiles Pull Requests
-
-Help your fellow students!
-
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to we ensure
-that students don't feel pressured to use one IDE or another.
-
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
-
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
-
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
-
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
-
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
-
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
+[MIT License](https://github.com/mhBahrami/MPC/blob/master/LICENSE).
